@@ -9,7 +9,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/gopistolet/gopistolet/smtp"
+	"github.com/gopistolet/smtp/smtp"
 	c "github.com/smartystreets/goconvey/convey"
 )
 

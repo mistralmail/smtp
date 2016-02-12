@@ -11,7 +11,7 @@ import (
 
 	"github.com/gopistolet/gopistolet/helpers"
 	"github.com/gopistolet/gopistolet/log"
-	"github.com/gopistolet/gopistolet/smtp"
+	"github.com/gopistolet/smtp/smtp"
 )
 
 type Config struct {
