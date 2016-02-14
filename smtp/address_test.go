@@ -74,6 +74,15 @@ func TestParseAddress(t *testing.T) {
 			So(address.GetLocal(), ShouldEqual, mail.parsed.Local)
 			So(address.GetDomain(), ShouldEqual, mail.parsed.Domain)
 			So(address.GetAddress(), ShouldEqual, mail.parsed.Address)
+
+			// Cyclic check:
+			//      string -> parsed address -> string -> parsed address
+			str := address.String()
+			address, err = ParseAddress(str)
+			So(err, ShouldEqual, nil)
+			So(address.GetLocal(), ShouldEqual, mail.parsed.Local)
+			So(address.GetDomain(), ShouldEqual, mail.parsed.Domain)
+			So(address.GetAddress(), ShouldEqual, mail.parsed.Address)
 		}
 
 		Convey("Testing ParseAddress() with invalid mail", func() {

@@ -25,6 +25,11 @@ func (address *MailAddress) GetAddress() string {
 	return address.Address
 }
 
+func (address *MailAddress) String() string {
+	a := mail.Address(*address)
+	return a.String()
+}
+
 // ParseAddress parses a string into a MailAddress.
 func ParseAddress(rawAddress string) (MailAddress, error) {
 
