@@ -223,8 +223,6 @@ func (s *DefaultMta) listen(ln net.Listener) error {
 		go s.serve(c)
 	}
 
-	// Dead code
-	panic("Can't get here")
 }
 
 func (s *DefaultMta) serve(c net.Conn) {
