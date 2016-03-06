@@ -17,7 +17,7 @@ import (
 var someIp string = "1.2.3.4"
 
 // Dummy mail handler
-func dummyHandler(*State) {
+func dummyHandler(*smtp.State) {
 
 }
 
@@ -28,6 +28,7 @@ type testProtocol struct {
 	cmds      []smtp.Cmd
 	answers   []interface{}
 	expectTLS bool
+	state     smtp.State
 }
 
 func getMailWithoutError(a string) *smtp.MailAddress {
@@ -89,6 +90,10 @@ func (p *testProtocol) StartTls(c *tls.Config) error {
 
 func (p *testProtocol) GetIP() net.IP {
 	return net.ParseIP("127.0.0.1")
+}
+
+func (p *testProtocol) GetState() *smtp.State {
+	return &p.state
 }
 
 // Tests answers for HELO,EHLO and QUIT
@@ -840,10 +845,10 @@ func TestStartTls(t *testing.T) {
 // Simple test for representation of SessionId
 func TestSessionId(t *testing.T) {
 	c.Convey("Testing Session ID String()", t, func() {
-		id := Id{Timestamp: 1446302030, Counter: 42}
+		id := smtp.Id{Timestamp: 1446302030, Counter: 42}
 		c.So(id.String(), c.ShouldEqual, "5634d14e2a")
 
-		id = Id{Timestamp: 2147483648, Counter: 4294967295}
+		id = smtp.Id{Timestamp: 2147483648, Counter: 4294967295}
 		c.So(id.String(), c.ShouldEqual, "80000000ffffffff")
 	})
 }

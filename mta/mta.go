@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	"strconv"
 	"sync"
 	"time"
 
@@ -24,86 +23,28 @@ type Config struct {
 }
 
 // Session id
-type Id struct {
-	Timestamp int64
-	Counter   uint32
-}
-
-func (id *Id) String() string {
-	return strconv.FormatInt(id.Timestamp, 16) + strconv.FormatInt(int64(id.Counter), 16)
-}
 
 var globalCounter uint32 = 0
 var globalCounterLock = &sync.Mutex{}
 
-func generateSessionId() Id {
+func generateSessionId() smtp.Id {
 	globalCounterLock.Lock()
 	defer globalCounterLock.Unlock()
 	globalCounter++
-	return Id{Timestamp: time.Now().Unix(), Counter: globalCounter}
+	return smtp.Id{Timestamp: time.Now().Unix(), Counter: globalCounter}
 
-}
-
-// State contains all the state for a single client
-type State struct {
-	From         *smtp.MailAddress
-	To           []*smtp.MailAddress
-	Data         []byte
-	EightBitMIME bool
-	Secure       bool
-	SessionId    Id
-	Ip           net.IP
 }
 
 // Handler is the interface that will be used when a mail was received.
 type Handler interface {
-	HandleMail(*State)
+	HandleMail(*smtp.State)
 }
 
 // HandlerFunc is a wrapper to allow normal functions to be used as a handler.
-type HandlerFunc func(*State)
+type HandlerFunc func(*smtp.State)
 
-func (h HandlerFunc) HandleMail(state *State) {
+func (h HandlerFunc) HandleMail(state *smtp.State) {
 	h(state)
-}
-
-// reset the state
-func (s *State) reset() {
-	s.From = nil
-	s.To = []*smtp.MailAddress{}
-	s.Data = []byte{}
-	s.EightBitMIME = false
-}
-
-// Checks the state if the client can send a MAIL command.
-func (s *State) canReceiveMail() (bool, string) {
-	if s.From != nil {
-		return false, "Sender already specified"
-	}
-
-	return true, ""
-}
-
-// Checks the state if the client can send a RCPT command.
-func (s *State) canReceiveRcpt() (bool, string) {
-	if s.From == nil {
-		return false, "Need mail before RCPT"
-	}
-
-	return true, ""
-}
-
-// Checks the state if the client can send a DATA command.
-func (s *State) canReceiveData() (bool, string) {
-	if s.From == nil {
-		return false, "Need mail before DATA"
-	}
-
-	if len(s.To) == 0 {
-		return false, "Need RCPT before DATA"
-	}
-
-	return true, ""
 }
 
 // Mta Represents an MTA server
@@ -242,8 +183,8 @@ func (s *Mta) HandleClient(proto smtp.Protocol) {
 	//log.Printf("Received connection")
 
 	// Hold state for this client connection
-	state := State{}
-	state.reset()
+	state := proto.GetState()
+	state.Reset()
 	state.SessionId = generateSessionId()
 	state.Ip = proto.GetIP()
 
@@ -333,7 +274,7 @@ func (s *Mta) HandleClient(proto smtp.Protocol) {
 			})
 
 		case smtp.EhloCmd:
-			state.reset()
+			state.Reset()
 
 			messages := []string{s.config.Hostname, "8BITMIME"}
 			if s.hasTls() && !state.Secure {
@@ -355,7 +296,7 @@ func (s *Mta) HandleClient(proto smtp.Protocol) {
 			quit = true
 
 		case smtp.MailCmd:
-			if ok, reason := state.canReceiveMail(); !ok {
+			if ok, reason := state.CanReceiveMail(); !ok {
 				proto.Send(smtp.Answer{
 					Status:  smtp.BadSequence,
 					Message: reason,
@@ -377,7 +318,7 @@ func (s *Mta) HandleClient(proto smtp.Protocol) {
 			})
 
 		case smtp.RcptCmd:
-			if ok, reason := state.canReceiveRcpt(); !ok {
+			if ok, reason := state.CanReceiveRcpt(); !ok {
 				proto.Send(smtp.Answer{
 					Status:  smtp.BadSequence,
 					Message: reason,
@@ -393,7 +334,7 @@ func (s *Mta) HandleClient(proto smtp.Protocol) {
 			})
 
 		case smtp.DataCmd:
-			if ok, reason := state.canReceiveData(); !ok {
+			if ok, reason := state.CanReceiveData(); !ok {
 				/*
 					RFC 5321 3.3
 
@@ -437,7 +378,7 @@ func (s *Mta) HandleClient(proto smtp.Protocol) {
 					Status:  smtp.SyntaxError,
 					Message: "Could not parse mail data",
 				})
-				state.reset()
+				state.Reset()
 				break
 
 			} else if err != nil {
@@ -447,7 +388,7 @@ func (s *Mta) HandleClient(proto smtp.Protocol) {
 				}).Panic(err)
 			}
 
-			s.MailHandler.HandleMail(&state)
+			s.MailHandler.HandleMail(state)
 
 			proto.Send(smtp.Answer{
 				Status:  smtp.Ok,
@@ -455,10 +396,10 @@ func (s *Mta) HandleClient(proto smtp.Protocol) {
 			})
 
 			// Reset state after mail was handled so we can start from a clean slate.
-			state.reset()
+			state.Reset()
 
 		case smtp.RsetCmd:
-			state.reset()
+			state.Reset()
 			proto.Send(smtp.Answer{
 				Status:  smtp.Ok,
 				Message: "OK",
@@ -499,7 +440,7 @@ func (s *Mta) HandleClient(proto smtp.Protocol) {
 				"Ip":        state.Ip.String(),
 				"SessionId": state.SessionId.String(),
 			}).Debug("TLS enabled")
-			state.reset()
+			state.Reset()
 			state.Secure = true
 
 		case smtp.NoopCmd:
@@ -545,5 +486,8 @@ func (s *Mta) HandleClient(proto smtp.Protocol) {
 	}
 
 	proto.Close()
-	//log.Printf("Closed connection")
+	log.WithFields(log.Fields{
+		"SessionId": state.SessionId.String(),
+		"Ip":        state.Ip.String(),
+	}).Debug("Closed connection")
 }

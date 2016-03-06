@@ -1,9 +1,6 @@
 package smtp
 
-import (
-	"bufio"
-	"github.com/gopistolet/gopistolet/log"
-)
+import "bufio"
 
 import "strings"
 import "errors"
@@ -26,7 +23,6 @@ func (p *parser) ParseCommand(br *bufio.Reader) (command Cmd, err error) {
 
 	var address *MailAddress
 	verb, args, err := parseLine(br)
-	log.Debugf("Verb: %s. args: %v", verb, args)
 	if err != nil {
 		return nil, err
 	}

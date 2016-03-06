@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 
 	"github.com/gopistolet/gopistolet/log"
 )
@@ -121,11 +122,14 @@ func (r *DataReader) Read(b []byte) (n int, err error) {
 		c, err = br.ReadByte()
 		if err != nil {
 			err = ErrIncomplete
-
+			break
 		}
 		r.bytesInLine++
 		if r.bytesInLine > MAX_DATA_LINE {
 			err = ErrLtl
+			SkipTillNewline(br)
+			r.bytesInLine = 0
+			r.state = stateBeginLine
 			break
 		}
 		switch r.state {
@@ -357,6 +361,65 @@ func (c SamlCmd) String() string {
 	return ""
 }
 
+type Id struct {
+	Timestamp int64
+	Counter   uint32
+}
+
+func (id *Id) String() string {
+	return strconv.FormatInt(id.Timestamp, 16) + strconv.FormatInt(int64(id.Counter), 16)
+}
+
+// State contains all the state for a single client
+type State struct {
+	From         *MailAddress
+	To           []*MailAddress
+	Data         []byte
+	EightBitMIME bool
+	Secure       bool
+	SessionId    Id
+	Ip           net.IP
+}
+
+// reset the state
+func (s *State) Reset() {
+	s.From = nil
+	s.To = []*MailAddress{}
+	s.Data = []byte{}
+	s.EightBitMIME = false
+}
+
+// Checks the state if the client can send a MAIL command.
+func (s *State) CanReceiveMail() (bool, string) {
+	if s.From != nil {
+		return false, "Sender already specified"
+	}
+
+	return true, ""
+}
+
+// Checks the state if the client can send a RCPT command.
+func (s *State) CanReceiveRcpt() (bool, string) {
+	if s.From == nil {
+		return false, "Need mail before RCPT"
+	}
+
+	return true, ""
+}
+
+// Checks the state if the client can send a DATA command.
+func (s *State) CanReceiveData() (bool, string) {
+	if s.From == nil {
+		return false, "Need mail before DATA"
+	}
+
+	if len(s.To) == 0 {
+		return false, "Need RCPT before DATA"
+	}
+
+	return true, ""
+}
+
 // Protocol Used as communication layer so we can easily switch between a real socket
 // and a test implementation.
 type Protocol interface {
@@ -371,12 +434,15 @@ type Protocol interface {
 	StartTls(*tls.Config) error
 	// GetIP gets the ip of the client.
 	GetIP() net.IP
+	// Get the state that belongs to this connection.
+	GetState() *State
 }
 
 type MtaProtocol struct {
 	c      net.Conn
 	br     *bufio.Reader
 	parser parser
+	state  *State
 }
 
 // NewMtaProtocol Creates a protocol that works over a socket.
@@ -386,22 +452,35 @@ func NewMtaProtocol(c net.Conn) *MtaProtocol {
 		c:      c,
 		br:     bufio.NewReader(c),
 		parser: parser{},
+		state:  &State{},
 	}
 
 	return proto
 }
 
 func (p *MtaProtocol) Send(c Cmd) {
+	log.WithFields(log.Fields{
+		"Cmd":       fmt.Sprintf("%#v", c),
+		"SessionId": p.state.SessionId.String(),
+		"Ip":        p.state.Ip.String(),
+	}).Debug("Sending cmd")
 	fmt.Fprintf(p.c, "%s\r\n", c)
 }
 
-func (p *MtaProtocol) GetCmd() (c *Cmd, err error) {
+func (p *MtaProtocol) GetCmd() (*Cmd, error) {
 	cmd, err := p.parser.ParseCommand(p.br)
 	if err != nil {
-		log.Printf("Could not parse command: %v", err)
+		log.WithFields(log.Fields{
+			"err": err,
+		}).Debug("MtaProtocol.GetCmd could not parse command")
 		return nil, err
 	}
 
+	log.WithFields(log.Fields{
+		"Cmd":       fmt.Sprintf("%#v", cmd),
+		"SessionId": p.state.SessionId.String(),
+		"Ip":        p.state.Ip.String(),
+	}).Debug("Received cmd")
 	return &cmd, nil
 }
 
@@ -432,4 +511,8 @@ func (p *MtaProtocol) GetIP() net.IP {
 	}
 
 	return net.ParseIP(ip)
+}
+
+func (p *MtaProtocol) GetState() *State {
+	return p.state
 }
