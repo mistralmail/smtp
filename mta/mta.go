@@ -268,6 +268,7 @@ func (s *Mta) HandleClient(proto smtp.Protocol) {
 
 		switch cmd := (*c).(type) {
 		case smtp.HeloCmd:
+			state.Hostname = cmd.Domain
 			proto.Send(smtp.Answer{
 				Status:  smtp.Ok,
 				Message: s.config.Hostname,
@@ -275,6 +276,7 @@ func (s *Mta) HandleClient(proto smtp.Protocol) {
 
 		case smtp.EhloCmd:
 			state.Reset()
+			state.Hostname = cmd.Domain
 
 			messages := []string{s.config.Hostname, "8BITMIME"}
 			if s.hasTls() && !state.Secure {

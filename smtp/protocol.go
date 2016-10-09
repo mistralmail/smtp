@@ -379,6 +379,7 @@ type State struct {
 	Secure       bool
 	SessionId    Id
 	Ip           net.IP
+	Hostname     string
 }
 
 // reset the state

@@ -135,6 +135,7 @@ func TestAnswersHeloQuit(t *testing.T) {
 			},
 		}
 		mta.HandleClient(proto)
+		c.So(proto.GetState().Hostname, c.ShouldEqual, "some.sender")
 	})
 
 	c.Convey("Testing answers for HELO and close connection.", t, func(ctx c.C) {
@@ -197,7 +198,7 @@ func TestAnswersHeloQuit(t *testing.T) {
 			ctx: ctx,
 			cmds: []smtp.Cmd{
 				smtp.EhloCmd{
-					Domain: "some.sender",
+					Domain: "some.sender.ehlo",
 				},
 				nil,
 			},
@@ -212,7 +213,7 @@ func TestAnswersHeloQuit(t *testing.T) {
 			},
 		}
 		mta.HandleClient(proto)
-
+		c.So(proto.GetState().Hostname, c.ShouldEqual, "some.sender.ehlo")
 	})
 }
 
