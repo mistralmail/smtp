@@ -37,13 +37,13 @@ func generateSessionId() smtp.Id {
 
 // Handler is the interface that will be used when a mail was received.
 type Handler interface {
-	HandleMail(*smtp.State)
+	Handle(*smtp.State)
 }
 
 // HandlerFunc is a wrapper to allow normal functions to be used as a handler.
 type HandlerFunc func(*smtp.State)
 
-func (h HandlerFunc) HandleMail(state *smtp.State) {
+func (h HandlerFunc) Handle(state *smtp.State) {
 	h(state)
 }
 
@@ -390,7 +390,7 @@ func (s *Mta) HandleClient(proto smtp.Protocol) {
 				}).Panic(err)
 			}
 
-			s.MailHandler.HandleMail(state)
+			s.MailHandler.Handle(state)
 
 			proto.Send(smtp.Answer{
 				Status:  smtp.Ok,
