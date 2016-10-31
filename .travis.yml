@@ -11,9 +11,6 @@ os:
 
 install:
   - go get github.com/smartystreets/goconvey/convey
-  - go get github.com/gopistolet/gospf
-  - go get github.com/sloonz/go-maildir
-  - go get github.com/Sirupsen/logrus
   - go get github.com/gopistolet/gopistolet/log
   - go get github.com/gopistolet/gopistolet/helpers
 

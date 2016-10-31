@@ -10,6 +10,7 @@ Acknowledgements
 -----------------
 
 * [GoConvey](github.com/smartystreets/goconvey/convey)
+* [Logrus](https://github.com/Sirupsen/logrus)
 
 Authors
 -------
