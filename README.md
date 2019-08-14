@@ -9,7 +9,7 @@ SMTP ([RFC 5321](https://tools.ietf.org/html/rfc5321)) implementation in Go.
 Acknowledgements
 -----------------
 
-* [GoConvey](github.com/smartystreets/goconvey/convey)
+* [GoConvey](https://github.com/smartystreets/goconvey)
 * [Logrus](https://github.com/Sirupsen/logrus)
 
 Authors
