@@ -125,7 +125,7 @@ func (s *DefaultMta) Stop() {
 func (s *DefaultMta) ListenAndServe() error {
 	ln, err := net.Listen("tcp", fmt.Sprintf("%s:%d", s.mta.config.Ip, s.mta.config.Port))
 	if err != nil {
-		log.Errorln("Could not start listening: %v", err)
+		log.Errorf("Could not start listening: %v", err)
 		return err
 	}
 
