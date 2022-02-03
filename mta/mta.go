@@ -37,14 +37,14 @@ func generateSessionId() smtp.Id {
 
 // Handler is the interface that will be used when a mail was received.
 type Handler interface {
-	Handle(*smtp.State)
+	Handle(*smtp.State) error
 }
 
 // HandlerFunc is a wrapper to allow normal functions to be used as a handler.
-type HandlerFunc func(*smtp.State)
+type HandlerFunc func(*smtp.State) error
 
-func (h HandlerFunc) Handle(state *smtp.State) {
-	h(state)
+func (h HandlerFunc) Handle(state *smtp.State) error {
+	return h(state)
 }
 
 // Mta Represents an MTA server
@@ -390,12 +390,24 @@ func (s *Mta) HandleClient(proto smtp.Protocol) {
 				}).Panic(err)
 			}
 
-			s.MailHandler.Handle(state)
-
-			proto.Send(smtp.Answer{
-				Status:  smtp.Ok,
-				Message: "Mail delivered",
-			})
+			// Handle mail
+			err = s.MailHandler.Handle(state)
+			if err != nil {
+				smtpErr, ok := err.(smtp.SMTPError)
+				if ok {
+					// known SMTP error, just return it
+					proto.Send(smtp.Answer(smtpErr))
+				} else {
+					// unknown internal server error
+					proto.Send(smtp.Answer{Status: 451, Message: "local error: something went wrong"})
+				}
+			} else {
+				// mail successfully handled!
+				proto.Send(smtp.Answer{
+					Status:  smtp.Ok,
+					Message: "Mail delivered",
+				})
+			}
 
 			// Reset state after mail was handled so we can start from a clean slate.
 			state.Reset()
