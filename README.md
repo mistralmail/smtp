@@ -1,7 +1,7 @@
 GoPistolet SMTP
 ===============
 
-[![Build Status](https://travis-ci.org/gopistolet/smtp.svg?branch=master)](https://travis-ci.org/gopistolet/smtp)
+[![Build Status](https://github.com/gopistolet/smtp/actions/workflows/go.yml/badge.svg?event=push)](https://github.com/gopistolet/smtp/actions/workflows/go.yml)
 
 SMTP ([RFC 5321](https://tools.ietf.org/html/rfc5321)) implementation in Go.
 
