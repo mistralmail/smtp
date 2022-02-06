@@ -17,8 +17,13 @@ import (
 var someIp string = "1.2.3.4"
 
 // Dummy mail handler
-func dummyHandler(*smtp.State) {
+func dummyHandler(*smtp.State) error {
+	return nil
+}
 
+// Dummy mail handler which returns error
+func dummyHandlerError(*smtp.State) error {
+	return smtp.SMTPErrorPermanentMailboxNotAvailable
 }
 
 type testProtocol struct {
@@ -851,5 +856,71 @@ func TestSessionId(t *testing.T) {
 
 		id = smtp.Id{Timestamp: 2147483648, Counter: 4294967295}
 		c.So(id.String(), c.ShouldEqual, "80000000ffffffff")
+	})
+}
+
+// Test whether error in handle() is correctly handled in the DATA command
+func TestErrorInHandler(t *testing.T) {
+	cfg := Config{
+		Hostname: "home.sweet.home",
+	}
+
+	mta := New(cfg, HandlerFunc(dummyHandlerError))
+	if mta == nil {
+		t.Fatal("Could not create mta server")
+	}
+
+	c.Convey("Testing with error in handle()", t, func(ctx c.C) {
+
+		proto := &testProtocol{
+			t:   t,
+			ctx: ctx,
+			cmds: []smtp.Cmd{
+				smtp.HeloCmd{
+					Domain: "some.sender",
+				},
+				smtp.MailCmd{
+					From: getMailWithoutError("someone@somewhere.test"),
+				},
+				smtp.RcptCmd{
+					To: getMailWithoutError("guy1@somewhere.test"),
+				},
+				smtp.DataCmd{
+					R: *smtp.NewDataReader(bufio.NewReader(bytes.NewReader([]byte("Some test email\n.\n")))),
+				},
+				smtp.QuitCmd{},
+			},
+			answers: []interface{}{
+				smtp.Answer{
+					Status:  smtp.Ready,
+					Message: cfg.Hostname + " Service Ready",
+				},
+				smtp.Answer{
+					Status:  smtp.Ok,
+					Message: cfg.Hostname,
+				},
+				smtp.Answer{
+					Status:  smtp.Ok,
+					Message: "OK",
+				},
+				smtp.Answer{
+					Status:  smtp.Ok,
+					Message: "OK",
+				},
+				smtp.Answer{
+					Status:  smtp.StartData,
+					Message: "OK",
+				},
+				smtp.Answer{
+					Status:  smtp.SMTPErrorPermanentMailboxNotAvailable.Status,
+					Message: smtp.SMTPErrorPermanentMailboxNotAvailable.Message,
+				},
+				smtp.Answer{
+					Status:  smtp.Closing,
+					Message: "Bye!",
+				},
+			},
+		}
+		mta.HandleClient(proto)
 	})
 }
