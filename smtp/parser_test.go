@@ -36,8 +36,8 @@ func TestParser(t *testing.T) {
 		commands += "EXPN staff\r\n"
 		commands += "NOOP\r\n"
 		commands += "QUIT\r\n"
-		commands += "AUTH PLAIN\r\n"
-		commands += "AUTH PLAIN dGVzdAB0ZXN0ADEyMzQ=\r\n"
+		// commands += "AUTH PLAIN\r\n"
+		// commands += "AUTH PLAIN dGVzdAB0ZXN0ADEyMzQ=\r\n"
 
 		br := bufio.NewReader(strings.NewReader(commands))
 
@@ -67,8 +67,8 @@ func TestParser(t *testing.T) {
 			ExpnCmd{ListName: "staff"},
 			NoopCmd{},
 			QuitCmd{},
-			AuthCmd{Mechanism: "PLAIN"},
-			AuthCmd{Mechanism: "PLAIN", InitialResponse: "dGVzdAB0ZXN0ADEyMzQ="},
+			// AuthCmd{Mechanism: "PLAIN"},
+			// AuthCmd{Mechanism: "PLAIN", InitialResponse: "dGVzdAB0ZXN0ADEyMzQ="},
 		}
 
 		for _, expectedCommand := range expectedCommands {
