@@ -36,6 +36,8 @@ func TestParser(t *testing.T) {
 		commands += "EXPN staff\r\n"
 		commands += "NOOP\r\n"
 		commands += "QUIT\r\n"
+		commands += "AUTH PLAIN\r\n"
+		commands += "AUTH PLAIN dGVzdAB0ZXN0ADEyMzQ=\r\n"
 
 		br := bufio.NewReader(strings.NewReader(commands))
 
@@ -65,6 +67,8 @@ func TestParser(t *testing.T) {
 			ExpnCmd{ListName: "staff"},
 			NoopCmd{},
 			QuitCmd{},
+			AuthCmd{Mechanism: "PLAIN"},
+			AuthCmd{Mechanism: "PLAIN", InitialResponse: "dGVzdAB0ZXN0ADEyMzQ="},
 		}
 
 		for _, expectedCommand := range expectedCommands {
@@ -159,7 +163,7 @@ func TestParser(t *testing.T) {
 			{
 				line: "HELO relay.example.org\r\n",
 				verb: "HELO",
-				args: map[string]Argument{"relay.example.org": Argument{Key: "relay.example.org"}},
+				args: map[string]Argument{"RELAY.EXAMPLE.ORG": Argument{Key: "relay.example.org"}},
 			},
 			{
 				line: "MAIL FROM:<bob@example.org>\r\n",
@@ -169,21 +173,31 @@ func TestParser(t *testing.T) {
 			{
 				line: "HELO some_ctrl_char\r\n",
 				verb: "HELO",
-				args: map[string]Argument{"some_ctrl_char": Argument{Key: "some_ctrl_char"}},
+				args: map[string]Argument{"SOME_CTRL_CHAR": Argument{Key: "some_ctrl_char"}},
 			},
 			{
 				line: "HELO some_ctrl_char\n",
 				verb: "HELO",
-				args: map[string]Argument{"some_ctrl_char": Argument{Key: "some_ctrl_char"}},
+				args: map[string]Argument{"SOME_CTRL_CHAR": Argument{Key: "some_ctrl_char"}},
+			},
+			{
+				line: "AUTH PLAIN\r\n",
+				verb: "AUTH",
+				args: map[string]Argument{"PLAIN": {Key: "PLAIN"}},
+			},
+			{
+				line: "AUTH PLAIN dGVzdAB0ZXN0ADEyMzQ=\r\n",
+				verb: "AUTH",
+				args: map[string]Argument{"PLAIN": {Key: "PLAIN"}, "DGVZDAB0ZXN0ADEYMZQ": {Key: "dGVzdAB0ZXN0ADEyMzQ", Operator: "="}},
 			},
 			{
 				line: "SOME_verb     a	b    c test1=value1 test2:value2\n",
 				verb: "SOME_VERB",
 				args: map[string]Argument{
-					"a\tb":  Argument{Key: "a\tb"},
-					"c":     Argument{Key: "c"},
-					"TEST1": Argument{Key: "TEST1", Value: "value1", Operator: "="},
-					"TEST2": Argument{Key: "TEST2", Value: "value2", Operator: ":"},
+					"A\tB":  Argument{Key: "a\tb"},
+					"C":     Argument{Key: "c"},
+					"TEST1": Argument{Key: "test1", Value: "value1", Operator: "="},
+					"TEST2": Argument{Key: "test2", Value: "value2", Operator: ":"},
 				},
 			},
 		}
@@ -246,5 +260,54 @@ func TestParser(t *testing.T) {
 			So(addr.GetAddress(), ShouldEqual, test.addressString)
 		}
 
+	})
+
+	Convey("Testing parseAuthPlainInitialRespone()", t, func() {
+
+		tests := []struct {
+			initialResponse       string
+			authenticationIdenity string
+			authorizationIdentity string
+			password              string
+		}{
+			{
+				initialResponse:       "dGVzdAB0ZXN0ADEyMzQ=",
+				authenticationIdenity: "test",
+				authorizationIdentity: "test",
+				password:              "1234",
+			},
+			{
+				initialResponse:       "dGVzdAB0ZXN0AHRlc3RwYXNz",
+				authenticationIdenity: "test",
+				authorizationIdentity: "test",
+				password:              "testpass",
+			},
+			{
+				initialResponse:       "YXV0aHoAYXV0aG4AcGFzcw==",
+				authenticationIdenity: "authn",
+				authorizationIdentity: "authz",
+				password:              "pass",
+			},
+			{
+				initialResponse:       "AGF1dGhuAHBhc3M=",
+				authenticationIdenity: "authn",
+				authorizationIdentity: "", // empty authorization identity
+				password:              "pass",
+			},
+		}
+
+		for _, test := range tests {
+			authorizationIdentity, authenticationIdenity, password, err := ParseAuthPlainInitialRespone(test.initialResponse)
+			So(err, ShouldEqual, nil)
+			So(authenticationIdenity, ShouldEqual, test.authenticationIdenity)
+			So(authorizationIdentity, ShouldEqual, test.authorizationIdentity)
+			So(password, ShouldEqual, test.password)
+		}
+
+		_, _, _, err := ParseAuthPlainInitialRespone("test")
+		So(err, ShouldBeError)
+
+		_, _, _, err = ParseAuthPlainInitialRespone("YXV0aHoAYXV0aG4=") // "authz\0authn"
+		So(err, ShouldBeError)
 	})
 }

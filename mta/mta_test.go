@@ -924,3 +924,186 @@ func TestErrorInHandler(t *testing.T) {
 		mta.HandleClient(proto)
 	})
 }
+
+func TestAuth(t *testing.T) {
+	cfg := Config{
+		Hostname: "home.sweet.home",
+	}
+
+	mta := New(cfg, HandlerFunc(dummyHandler))
+	if mta == nil {
+		t.Fatal("Could not create mta server")
+	}
+
+	mta.AuthBackend = NewAuthBackendMemory(map[string]string{"some-username": "password1234"})
+
+	c.Convey("Testing AUTH with correct credentials", t, func(ctx c.C) {
+
+		proto := &testProtocol{
+			t:   t,
+			ctx: ctx,
+			cmds: []smtp.Cmd{
+				smtp.HeloCmd{
+					Domain: "some.sender",
+				},
+				smtp.AuthCmd{
+					Mechanism:       "PLAIN",
+					InitialResponse: "AHNvbWUtdXNlcm5hbWUAcGFzc3dvcmQxMjM0",
+				},
+				smtp.QuitCmd{},
+			},
+			answers: []interface{}{
+				smtp.Answer{
+					Status:  smtp.Ready,
+					Message: cfg.Hostname + " Service Ready",
+				},
+				smtp.Answer{
+					Status:  smtp.Ok,
+					Message: cfg.Hostname,
+				},
+				smtp.Answer{
+					Status:  smtp.AuthenticationSucceeded,
+					Message: "2.7.0 Authentication successful",
+				},
+				smtp.Answer{
+					Status:  smtp.Closing,
+					Message: "Bye!",
+				},
+			},
+		}
+
+		c.So(proto.GetState().Authenticated, c.ShouldEqual, false)
+
+		mta.HandleClient(proto)
+		c.So(proto.GetState().Hostname, c.ShouldEqual, "some.sender")
+		c.So(proto.GetState().Authenticated, c.ShouldEqual, true)
+	})
+
+	c.Convey("Testing AUTH with incorrect credentials", t, func(ctx c.C) {
+
+		proto := &testProtocol{
+			t:   t,
+			ctx: ctx,
+			cmds: []smtp.Cmd{
+				smtp.HeloCmd{
+					Domain: "some.sender",
+				},
+				smtp.AuthCmd{
+					Mechanism:       "PLAIN",
+					InitialResponse: "AHNvbWUtdXNlcm5hbWUAc29tZS1pbmNvcnJlY3QtcGFzc3dvcmQ=",
+				},
+				smtp.QuitCmd{},
+			},
+			answers: []interface{}{
+				smtp.Answer{
+					Status:  smtp.Ready,
+					Message: cfg.Hostname + " Service Ready",
+				},
+				smtp.Answer{
+					Status:  smtp.Ok,
+					Message: cfg.Hostname,
+				},
+				smtp.Answer{
+					Status:  smtp.AuthenticationCredentialsInvalid,
+					Message: "5.7.8  Authentication credentials invalid",
+				},
+				smtp.Answer{
+					Status:  smtp.Closing,
+					Message: "Bye!",
+				},
+			},
+		}
+
+		c.So(proto.GetState().Authenticated, c.ShouldEqual, false)
+
+		mta.HandleClient(proto)
+		c.So(proto.GetState().Hostname, c.ShouldEqual, "some.sender")
+		c.So(proto.GetState().Authenticated, c.ShouldEqual, false)
+	})
+
+	c.Convey("Testing AUTH with credentials in different command", t, func(ctx c.C) {
+
+		proto := &testProtocol{
+			t:   t,
+			ctx: ctx,
+			cmds: []smtp.Cmd{
+				smtp.HeloCmd{
+					Domain: "some.sender",
+				},
+				smtp.AuthCmd{
+					Mechanism:       "PLAIN",
+					InitialResponse: "",
+					R:               *bufio.NewReader(bytes.NewReader([]byte("AHNvbWUtdXNlcm5hbWUAcGFzc3dvcmQxMjM0\r\n"))),
+				},
+				smtp.QuitCmd{},
+			},
+			answers: []interface{}{
+				smtp.Answer{
+					Status:  smtp.Ready,
+					Message: cfg.Hostname + " Service Ready",
+				},
+				smtp.Answer{
+					Status:  smtp.Ok,
+					Message: cfg.Hostname,
+				},
+				smtp.Answer{
+					Status:  smtp.AuthenticationSucceeded,
+					Message: "2.7.0 Authentication successful",
+				},
+				smtp.Answer{
+					Status:  smtp.Closing,
+					Message: "Bye!",
+				},
+			},
+		}
+
+		c.So(proto.GetState().Authenticated, c.ShouldEqual, false)
+
+		mta.HandleClient(proto)
+		c.So(proto.GetState().Hostname, c.ShouldEqual, "some.sender")
+		c.So(proto.GetState().Authenticated, c.ShouldEqual, true)
+	})
+
+	c.Convey("Testing AUTH with unknown mechanism", t, func(ctx c.C) {
+
+		proto := &testProtocol{
+			t:   t,
+			ctx: ctx,
+			cmds: []smtp.Cmd{
+				smtp.HeloCmd{
+					Domain: "some.sender",
+				},
+				smtp.AuthCmd{
+					Mechanism:       "SOME_UNKNOWN_MECHANISM",
+					InitialResponse: "",
+				},
+				smtp.QuitCmd{},
+			},
+			answers: []interface{}{
+				smtp.Answer{
+					Status:  smtp.Ready,
+					Message: cfg.Hostname + " Service Ready",
+				},
+				smtp.Answer{
+					Status:  smtp.Ok,
+					Message: cfg.Hostname,
+				},
+				smtp.Answer{
+					Status:  smtp.UnrecognizedAuthenticationType,
+					Message: "5.7.4 Unrecognized authentication type",
+				},
+				smtp.Answer{
+					Status:  smtp.Closing,
+					Message: "Bye!",
+				},
+			},
+		}
+
+		c.So(proto.GetState().Authenticated, c.ShouldEqual, false)
+
+		mta.HandleClient(proto)
+		c.So(proto.GetState().Hostname, c.ShouldEqual, "some.sender")
+		c.So(proto.GetState().Authenticated, c.ShouldEqual, false)
+	})
+
+}

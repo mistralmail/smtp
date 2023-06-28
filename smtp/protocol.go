@@ -29,6 +29,22 @@ const (
 	NoValidRecipients StatusCode = 554
 )
 
+// SMTP status codes for AUTH extension (RFC 4954)
+const (
+	AuthenticationSucceeded                               StatusCode = 235
+	EncodedString                                         StatusCode = 334
+	PasswordTransitionNeeded                              StatusCode = 432
+	TemporaryAuthenticationFailure                        StatusCode = 454
+	AuthenticationExchangeLineTooLong                     StatusCode = 500
+	MalformedAuthInput                                    StatusCode = 501
+	AuthCommandNotPermittedDuringMailTransaction          StatusCode = 503
+	UnrecognizedAuthenticationType                        StatusCode = 504
+	AuthenticationRequired                                StatusCode = 530
+	AuthenticationMechanismTooWeak                        StatusCode = 534
+	AuthenticationCredentialsInvalid                      StatusCode = 535
+	EncryptionRequiredForRequestedAuthenticationMechanism StatusCode = 538
+)
+
 // ErrLtl Line too long error
 var ErrLtl = errors.New("Line too long")
 
@@ -361,6 +377,16 @@ func (c SamlCmd) String() string {
 	return ""
 }
 
+type AuthCmd struct {
+	Mechanism       string
+	InitialResponse string
+	R               bufio.Reader
+}
+
+func (c AuthCmd) String() string {
+	return fmt.Sprintf("AUTH %s", c.Mechanism)
+}
+
 type Id struct {
 	Timestamp int64
 	Counter   uint32
@@ -372,14 +398,15 @@ func (id *Id) String() string {
 
 // State contains all the state for a single client
 type State struct {
-	From         *MailAddress
-	To           []*MailAddress
-	Data         []byte
-	EightBitMIME bool
-	Secure       bool
-	SessionId    Id
-	Ip           net.IP
-	Hostname     string
+	From          *MailAddress
+	To            []*MailAddress
+	Data          []byte
+	EightBitMIME  bool
+	Secure        bool
+	SessionId     Id
+	Ip            net.IP
+	Hostname      string
+	Authenticated bool
 }
 
 // reset the state

@@ -1,9 +1,13 @@
 package smtp
 
-import "bufio"
-
-import "strings"
-import "errors"
+import (
+	"bufio"
+	"bytes"
+	"encoding/base64"
+	"errors"
+	"fmt"
+	"strings"
+)
 
 type parser struct {
 }
@@ -177,6 +181,28 @@ func (p *parser) ParseCommand(br *bufio.Reader) (command Cmd, err error) {
 		{
 			command = StartTlsCmd{}
 		}
+	case "AUTH":
+		{
+			mechanism := ""
+			initialResponse := ""
+			// TODO: make this better
+			count := 0
+			for _, arg := range args {
+				if count == 0 {
+					mechanism = arg.Key
+				}
+				if count == 1 {
+					initialResponse = arg.Key + arg.Operator + arg.Value
+				}
+				count++
+
+			}
+			command = AuthCmd{
+				Mechanism:       mechanism,
+				InitialResponse: initialResponse,
+				R:               *br,
+			}
+		}
 
 	default:
 		{
@@ -238,7 +264,7 @@ func parseLine(br *bufio.Reader) (string, map[string]Argument, error) {
 		if i == -1 {
 			argument.Key = strings.TrimSpace(arg)
 		} else {
-			argument.Key = strings.ToUpper(strings.TrimSpace(arg[:i]))
+			argument.Key = strings.TrimSpace(arg[:i])
 			argument.Value = strings.TrimSpace(arg[i+1:])
 			argument.Operator = arg[i : i+1]
 		}
@@ -247,7 +273,9 @@ func parseLine(br *bufio.Reader) (string, map[string]Argument, error) {
 			continue
 		}
 
-		argMap[argument.Key] = argument
+		// Put key in the arguments map in uppercase to make sure
+		// we are case insensitive
+		argMap[strings.ToUpper(argument.Key)] = argument
 	}
 
 	return verb, argMap, nil
@@ -287,4 +315,30 @@ func parseTO(to string) (*MailAddress, error) {
 		return nil, err
 	}
 	return &address, nil
+}
+
+// ParseAuthPlainInitialRespone parses the base64 encoded initial response of an Auth PLAIN request
+//
+// "The mechanism consists of a single message from the client to the server. The
+// client sends the authorization identity (identity to login as), followed by a
+// US-ASCII NulL character, followed by the authentication identity (identity whose
+// password will be used), followed by a US-ASCII NulL character, followed by the
+// clear-text password. The client may leave the authorization identity empty to indicate
+// that it is the same as the authentication identity."
+func ParseAuthPlainInitialRespone(initialResponse string) (authorizationIdentity string, authenticationIdenity string, password string, err error) {
+	initialResponseByte, err := base64.StdEncoding.DecodeString(initialResponse)
+	if err != nil {
+		err = fmt.Errorf("couldn't decode base64 %v", err)
+		return
+	}
+	initialResponseByteSplit := bytes.Split(initialResponseByte, []byte("\x00"))
+	if len(initialResponseByteSplit) != 3 {
+		err = fmt.Errorf("couldn't parse initial response: expected exactly 3 arguments")
+		return
+	}
+
+	authorizationIdentity = string(initialResponseByteSplit[0])
+	authenticationIdenity = string(initialResponseByteSplit[1])
+	password = string(initialResponseByteSplit[2])
+	return
 }

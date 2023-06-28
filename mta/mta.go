@@ -53,7 +53,8 @@ type Mta struct {
 	// The handler to be called when a mail is received.
 	MailHandler Handler
 	// The config for tls connection. Nil if not supported.
-	TlsConfig *tls.Config
+	TlsConfig   *tls.Config
+	AuthBackend AuthBackend
 	// When shutting down this channel is closed, no new connections should be handled then.
 	// But existing connections can continue untill quitC is closed.
 	shutDownC chan bool
@@ -81,6 +82,8 @@ func New(c Config, h Handler) *Mta {
 			}
 		}
 	}
+
+	// TODO what if authbackend is nil?
 
 	return mta
 }
@@ -483,6 +486,110 @@ func (s *Mta) HandleClient(proto smtp.Protocol) {
 				Status:  smtp.SyntaxError,
 				Message: "Command not recognized",
 			})
+
+		case smtp.AuthCmd:
+
+			if cmd.Mechanism != "PLAIN" {
+				proto.Send(smtp.Answer{
+					Status:  smtp.UnrecognizedAuthenticationType,
+					Message: "5.7.4 Unrecognized authentication type",
+				})
+				break
+			}
+
+			initialResponse := ""
+
+			// If no credentials are not present in AUTH command, prompt the client for them.
+			if cmd.InitialResponse == "" {
+				//tmpData, err := ioutil.ReadAll(&cmd.R)
+				tmpData, err := smtp.ReadUntill('\n', smtp.MAX_CMD_LINE, &cmd.R)
+				initialResponse = string(tmpData)
+				if err != nil {
+					// I think this can only happen on a socket if it gets closed before receiving the full data.
+					log.WithFields(log.Fields{
+						"SessionId": state.SessionId.String(),
+					}).Warnln(err)
+					proto.Send(smtp.Answer{
+						Status:  smtp.MalformedAuthInput,
+						Message: "Could not parse auth data",
+					})
+					break
+
+				}
+			} else {
+				initialResponse = cmd.InitialResponse
+			}
+
+			authorizationIdentity, authenticationIdenity, password, err := smtp.ParseAuthPlainInitialRespone(initialResponse)
+			if err != nil {
+
+				log.WithFields(log.Fields{
+					"Ip":        state.Ip.String(),
+					"SessionId": state.SessionId.String(),
+				}).Warningf("Could not decode base64: %v", err)
+
+				proto.Send(smtp.Answer{
+					Status:  smtp.SyntaxErrorParam,
+					Message: "Invalid initial response for PLAIN auth",
+				})
+
+				break
+
+			}
+
+			log.WithFields(log.Fields{
+				"authorization-identity":  authorizationIdentity,
+				"authentication-identity": authenticationIdenity,
+				// "password":                "password",
+				// let's not log user passwords....
+			}).Debugln("received auth")
+
+			// TODO check if AuthBackend is initialized
+			// TODO make auth optional or enforce it?
+			if s.AuthBackend == nil {
+				log.Errorln("AuthBackend not initialized")
+				proto.Send(smtp.Answer{
+					Status:  smtp.TemporaryAuthenticationFailure,
+					Message: "4.7.0  Temporary authentication failure",
+				})
+				break
+			}
+
+			validAuth, err := s.AuthBackend.Login(authenticationIdenity, password)
+			if validAuth {
+
+				state.Authenticated = true
+
+				log.WithFields(log.Fields{
+					"Ip":        state.Ip.String(),
+					"SessionId": state.SessionId.String(),
+				}).Printf("valid auth for user: %s", authenticationIdenity)
+
+				proto.Send(smtp.Answer{
+					Status:  smtp.AuthenticationSucceeded,
+					Message: "2.7.0 Authentication successful",
+				})
+
+				break
+			} else {
+
+				state.Authenticated = false
+
+				log.WithFields(log.Fields{
+					"Ip":        state.Ip.String(),
+					"SessionId": state.SessionId.String(),
+				}).Printf("invalid auth for user: %s", authenticationIdenity)
+
+				proto.Send(smtp.Answer{
+					Status:  smtp.AuthenticationCredentialsInvalid,
+					Message: "5.7.8  Authentication credentials invalid",
+				})
+
+				break
+			}
+
+			//initialResponseText := string(initialResponseByte)
+			//log.Fatalf("initial-response: %v", initialResponseText)
 
 		default:
 			// TODO: We get here if the switch does not handle all Cmd's defined
