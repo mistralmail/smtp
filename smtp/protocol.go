@@ -407,6 +407,13 @@ type State struct {
 	Ip            net.IP
 	Hostname      string
 	Authenticated bool
+	User          User
+}
+
+// User denotes an authenticated SMTP user.
+type User interface {
+	// Username returns the username / email address of the user.
+	Username() string
 }
 
 // reset the state
@@ -444,6 +451,21 @@ func (s *State) CanReceiveData() (bool, string) {
 	if len(s.To) == 0 {
 		return false, "Need RCPT before DATA"
 	}
+
+	return true, ""
+}
+
+// Check whether the auth user is allowed to send from the MAIL FROM email address and to the RCPT TO address.
+func (s *State) AuthMatchesRcptAndMail() (bool, string) {
+
+	// TODO: what if one of those variables is nil?
+
+	// TODO: handle if user can send from multiple email addresses
+	if s.From.Address != s.User.Username() {
+		return false, fmt.Sprintf("5.7.1 Sender address rejected: not owned by user %s", s.User.Username())
+	}
+
+	// TODO: check for recipient?
 
 	return true, ""
 }

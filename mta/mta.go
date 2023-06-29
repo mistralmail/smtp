@@ -14,12 +14,13 @@ import (
 )
 
 type Config struct {
-	Ip        string
-	Hostname  string
-	Port      uint32
-	TlsCert   string
-	TlsKey    string
-	Blacklist helpers.Blacklist
+	Ip          string
+	Hostname    string
+	Port        uint32
+	TlsCert     string
+	TlsKey      string
+	Blacklist   helpers.Blacklist
+	DisableAuth bool
 }
 
 // Session id
@@ -308,6 +309,13 @@ func (s *Mta) HandleClient(proto smtp.Protocol) {
 				})
 				break
 			}
+			if !s.config.DisableAuth && !state.Authenticated {
+				proto.Send(smtp.Answer{
+					Status:  smtp.AuthenticationRequired,
+					Message: "Authentication Required",
+				})
+				break
+			}
 
 			state.From = cmd.From
 			state.EightBitMIME = cmd.EightBitMIME
@@ -332,6 +340,18 @@ func (s *Mta) HandleClient(proto smtp.Protocol) {
 			}
 
 			state.To = append(state.To, cmd.To)
+
+			if !s.config.DisableAuth {
+				// TODO check if to/from email address allowed
+				if ok, reason := state.AuthMatchesRcptAndMail(); !ok {
+					proto.Send(smtp.Answer{
+						Status:  smtp.SMTPErrorPermanentMailboxNameNotAllowed.Status,
+						Message: reason,
+					})
+					state.Reset()
+					break
+				}
+			}
 
 			proto.Send(smtp.Answer{
 				Status:  smtp.Ok,
@@ -544,8 +564,7 @@ func (s *Mta) HandleClient(proto smtp.Protocol) {
 				// let's not log user passwords....
 			}).Debugln("received auth")
 
-			// TODO check if AuthBackend is initialized
-			// TODO make auth optional or enforce it?
+			// Check if AuthBackend is initialized
 			if s.AuthBackend == nil {
 				log.Errorln("AuthBackend not initialized")
 				proto.Send(smtp.Answer{
@@ -555,24 +574,9 @@ func (s *Mta) HandleClient(proto smtp.Protocol) {
 				break
 			}
 
-			validAuth, err := s.AuthBackend.Login(authenticationIdenity, password)
-			if validAuth {
-
-				state.Authenticated = true
-
-				log.WithFields(log.Fields{
-					"Ip":        state.Ip.String(),
-					"SessionId": state.SessionId.String(),
-				}).Printf("valid auth for user: %s", authenticationIdenity)
-
-				proto.Send(smtp.Answer{
-					Status:  smtp.AuthenticationSucceeded,
-					Message: "2.7.0 Authentication successful",
-				})
-
-				break
-			} else {
-
+			user, err := s.AuthBackend.Login(authenticationIdenity, password)
+			if err == ErrInvalidCredentials {
+				// Invalid credentials
 				state.Authenticated = false
 
 				log.WithFields(log.Fields{
@@ -587,6 +591,35 @@ func (s *Mta) HandleClient(proto smtp.Protocol) {
 
 				break
 			}
+			if err != nil {
+				// Other error
+				state.Authenticated = false
+
+				log.WithFields(log.Fields{
+					"Ip":        state.Ip.String(),
+					"SessionId": state.SessionId.String(),
+				}).Printf("authentication failed for user: %s with error: %v", authenticationIdenity, err)
+
+				proto.Send(smtp.Answer{
+					Status:  smtp.TemporaryAuthenticationFailure,
+					Message: "4.7.0 Temporary authentication failure",
+				})
+			}
+
+			// Valid auth
+
+			state.Authenticated = true
+			state.User = user
+
+			log.WithFields(log.Fields{
+				"Ip":        state.Ip.String(),
+				"SessionId": state.SessionId.String(),
+			}).Printf("valid auth for user: %s", authenticationIdenity)
+
+			proto.Send(smtp.Answer{
+				Status:  smtp.AuthenticationSucceeded,
+				Message: "2.7.0 Authentication successful",
+			})
 
 			//initialResponseText := string(initialResponseByte)
 			//log.Fatalf("initial-response: %v", initialResponseText)

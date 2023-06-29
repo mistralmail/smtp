@@ -104,7 +104,8 @@ func (p *testProtocol) GetState() *smtp.State {
 // Tests answers for HELO,EHLO and QUIT
 func TestAnswersHeloQuit(t *testing.T) {
 	cfg := Config{
-		Hostname: "home.sweet.home",
+		Hostname:    "home.sweet.home",
+		DisableAuth: true,
 	}
 
 	mta := New(cfg, HandlerFunc(dummyHandler))
@@ -225,7 +226,8 @@ func TestAnswersHeloQuit(t *testing.T) {
 // Test answers if we are given a sequence of MAIL,RCPT,DATA commands.
 func TestMailAnswersCorrectSequence(t *testing.T) {
 	cfg := Config{
-		Hostname: "home.sweet.home",
+		Hostname:    "home.sweet.home",
+		DisableAuth: true,
 	}
 
 	mta := New(cfg, HandlerFunc(dummyHandler))
@@ -458,7 +460,8 @@ func TestMailAnswersCorrectSequence(t *testing.T) {
 // Tests if our state gets reset correctly.
 func TestReset(t *testing.T) {
 	cfg := Config{
-		Hostname: "home.sweet.home",
+		Hostname:    "home.sweet.home",
+		DisableAuth: true,
 	}
 
 	mta := New(cfg, HandlerFunc(dummyHandler))
@@ -679,7 +682,8 @@ func TestReset(t *testing.T) {
 // Tests answers if we send an unknown command.
 func TestAnswersUnknownCmd(t *testing.T) {
 	cfg := Config{
-		Hostname: "home.sweet.home",
+		Hostname:    "home.sweet.home",
+		DisableAuth: true,
 	}
 
 	mta := New(cfg, HandlerFunc(dummyHandler))
@@ -726,7 +730,8 @@ func TestAnswersUnknownCmd(t *testing.T) {
 // Tests STARTTLS
 func TestStartTls(t *testing.T) {
 	cfg := Config{
-		Hostname: "home.sweet.home",
+		Hostname:    "home.sweet.home",
+		DisableAuth: true,
 	}
 
 	mta := New(cfg, HandlerFunc(dummyHandler))
@@ -862,7 +867,8 @@ func TestSessionId(t *testing.T) {
 // Test whether error in handle() is correctly handled in the DATA command
 func TestErrorInHandler(t *testing.T) {
 	cfg := Config{
-		Hostname: "home.sweet.home",
+		Hostname:    "home.sweet.home",
+		DisableAuth: true,
 	}
 
 	mta := New(cfg, HandlerFunc(dummyHandlerError))
@@ -935,7 +941,7 @@ func TestAuth(t *testing.T) {
 		t.Fatal("Could not create mta server")
 	}
 
-	mta.AuthBackend = NewAuthBackendMemory(map[string]string{"some-username": "password1234"})
+	mta.AuthBackend = NewAuthBackendMemory(map[string]string{"some-username@example.com": "password1234"})
 
 	c.Convey("Testing AUTH with correct credentials", t, func(ctx c.C) {
 
@@ -948,7 +954,7 @@ func TestAuth(t *testing.T) {
 				},
 				smtp.AuthCmd{
 					Mechanism:       "PLAIN",
-					InitialResponse: "AHNvbWUtdXNlcm5hbWUAcGFzc3dvcmQxMjM0",
+					InitialResponse: "AHNvbWUtdXNlcm5hbWVAZXhhbXBsZS5jb20AcGFzc3dvcmQxMjM0",
 				},
 				smtp.QuitCmd{},
 			},
@@ -1033,7 +1039,7 @@ func TestAuth(t *testing.T) {
 				smtp.AuthCmd{
 					Mechanism:       "PLAIN",
 					InitialResponse: "",
-					R:               *bufio.NewReader(bytes.NewReader([]byte("AHNvbWUtdXNlcm5hbWUAcGFzc3dvcmQxMjM0\r\n"))),
+					R:               *bufio.NewReader(bytes.NewReader([]byte("AHNvbWUtdXNlcm5hbWVAZXhhbXBsZS5jb20AcGFzc3dvcmQxMjM0\r\n"))),
 				},
 				smtp.QuitCmd{},
 			},
@@ -1104,6 +1110,133 @@ func TestAuth(t *testing.T) {
 		mta.HandleClient(proto)
 		c.So(proto.GetState().Hostname, c.ShouldEqual, "some.sender")
 		c.So(proto.GetState().Authenticated, c.ShouldEqual, false)
+	})
+
+	c.Convey("Testing MAIL FROM when not authenticated and again after authentication", t, func(ctx c.C) {
+
+		proto := &testProtocol{
+			t:   t,
+			ctx: ctx,
+			cmds: []smtp.Cmd{
+				smtp.HeloCmd{
+					Domain: "some.sender",
+				},
+				smtp.MailCmd{
+					From: getMailWithoutError("test@test.com"),
+				},
+				smtp.AuthCmd{
+					Mechanism:       "PLAIN",
+					InitialResponse: "AHNvbWUtdXNlcm5hbWVAZXhhbXBsZS5jb20AcGFzc3dvcmQxMjM0",
+				},
+				smtp.MailCmd{
+					From: getMailWithoutError("test@test.com"),
+				},
+				smtp.QuitCmd{},
+			},
+			answers: []interface{}{
+				smtp.Answer{
+					Status:  smtp.Ready,
+					Message: cfg.Hostname + " Service Ready",
+				},
+				smtp.Answer{
+					Status:  smtp.Ok,
+					Message: cfg.Hostname,
+				},
+				smtp.Answer{
+					Status:  smtp.AuthenticationRequired,
+					Message: "Authentication Required",
+				},
+				smtp.Answer{
+					Status:  smtp.AuthenticationSucceeded,
+					Message: "2.7.0 Authentication successful",
+				},
+				smtp.Answer{
+					Status:  smtp.Ok,
+					Message: "OK",
+				},
+				smtp.Answer{
+					Status:  smtp.Closing,
+					Message: "Bye!",
+				},
+			},
+		}
+
+		c.So(proto.GetState().Authenticated, c.ShouldEqual, false)
+
+		mta.HandleClient(proto)
+		c.So(proto.GetState().Hostname, c.ShouldEqual, "some.sender")
+		c.So(proto.GetState().Authenticated, c.ShouldEqual, true)
+	})
+
+	c.Convey("Testing AUTH when sending from a wrong email address", t, func(ctx c.C) {
+
+		proto := &testProtocol{
+			t:   t,
+			ctx: ctx,
+			cmds: []smtp.Cmd{
+				smtp.HeloCmd{
+					Domain: "some.sender",
+				},
+				smtp.AuthCmd{
+					Mechanism:       "PLAIN",
+					InitialResponse: "AHNvbWUtdXNlcm5hbWVAZXhhbXBsZS5jb20AcGFzc3dvcmQxMjM0",
+				},
+				smtp.MailCmd{
+					From: getMailWithoutError("some.addres.that.is.not.mine@example.com"),
+				},
+				smtp.RcptCmd{
+					To: getMailWithoutError("test@example.com"),
+				},
+				// Try again with correct username
+				smtp.MailCmd{
+					From: getMailWithoutError("some-username@example.com"),
+				},
+				smtp.RcptCmd{
+					To: getMailWithoutError("test@example.com"),
+				},
+				smtp.QuitCmd{},
+			},
+			answers: []interface{}{
+				smtp.Answer{
+					Status:  smtp.Ready,
+					Message: cfg.Hostname + " Service Ready",
+				},
+				smtp.Answer{
+					Status:  smtp.Ok,
+					Message: cfg.Hostname,
+				},
+				smtp.Answer{
+					Status:  smtp.AuthenticationSucceeded,
+					Message: "2.7.0 Authentication successful",
+				},
+				smtp.Answer{
+					Status:  smtp.Ok,
+					Message: "OK",
+				},
+				smtp.Answer{
+					Status:  smtp.SMTPErrorPermanentMailboxNameNotAllowed.Status,
+					Message: "5.7.1 Sender address rejected: not owned by user some.addres.that.is.not.mine@example.com",
+				},
+				smtp.Answer{
+					Status:  smtp.Ok,
+					Message: "OK",
+				},
+				smtp.Answer{
+					Status:  smtp.Ok,
+					Message: "OK",
+				},
+				smtp.Answer{
+					Status:  smtp.Closing,
+					Message: "Bye!",
+				},
+			},
+		}
+
+		c.So(proto.GetState().Authenticated, c.ShouldEqual, false)
+
+		mta.HandleClient(proto)
+		c.So(proto.GetState().Hostname, c.ShouldEqual, "some.sender")
+		c.So(proto.GetState().Authenticated, c.ShouldEqual, true)
 	})
 
 }
