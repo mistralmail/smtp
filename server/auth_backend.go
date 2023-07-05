@@ -1,4 +1,4 @@
-package mta
+package server
 
 import (
 	"errors"

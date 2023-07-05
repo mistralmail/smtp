@@ -1,4 +1,4 @@
-package mta
+package server
 
 import (
 	"crypto/tls"
@@ -48,8 +48,8 @@ func (h HandlerFunc) Handle(state *smtp.State) error {
 	return h(state)
 }
 
-// Mta Represents an MTA server
-type Mta struct {
+// Server Represents an SMTP server
+type Server struct {
 	config Config
 	// The handler to be called when a mail is received.
 	MailHandler Handler
@@ -64,9 +64,9 @@ type Mta struct {
 	wg    sync.WaitGroup
 }
 
-// New Create a new MTA server that doesn't handle the protocol.
-func New(c Config, h Handler) *Mta {
-	mta := &Mta{
+// New Create a new SMTP server that doesn't handle the protocol.
+func New(c Config, h Handler) *Server {
+	mta := &Server{
 		config:      c,
 		MailHandler: h,
 		quitC:       make(chan bool),
@@ -89,7 +89,7 @@ func New(c Config, h Handler) *Mta {
 	return mta
 }
 
-func (s *Mta) Stop() {
+func (s *Server) Stop() {
 	log.Printf("Received stop command. Sending shutdown event...")
 	close(s.shutDownC)
 	// Give existing connections some time to finish.
@@ -100,20 +100,20 @@ func (s *Mta) Stop() {
 	close(s.quitC)
 }
 
-func (s *Mta) hasTls() bool {
+func (s *Server) hasTls() bool {
 	return s.TlsConfig != nil
 }
 
 // Same as the Mta struct but has methods for handling socket connections.
 type DefaultMta struct {
-	mta *Mta
+	Server *Server
 }
 
-// NewDefault Create a new MTA server with a
+// NewDefault Create a new SMTP server with a
 // socket protocol implementation.
 func NewDefault(c Config, h Handler) *DefaultMta {
 	mta := &DefaultMta{
-		mta: New(c, h),
+		Server: New(c, h),
 	}
 	if mta == nil {
 		return nil
@@ -123,11 +123,11 @@ func NewDefault(c Config, h Handler) *DefaultMta {
 }
 
 func (s *DefaultMta) Stop() {
-	s.mta.Stop()
+	s.Server.Stop()
 }
 
 func (s *DefaultMta) ListenAndServe() error {
-	ln, err := net.Listen("tcp", fmt.Sprintf("%s:%d", s.mta.config.Ip, s.mta.config.Port))
+	ln, err := net.Listen("tcp", fmt.Sprintf("%s:%d", s.Server.config.Ip, s.Server.config.Port))
 	if err != nil {
 		log.Errorf("Could not start listening: %v", err)
 		return err
@@ -135,7 +135,7 @@ func (s *DefaultMta) ListenAndServe() error {
 
 	// Close the listener so that listen well return from ln.Accept().
 	go func() {
-		_, ok := <-s.mta.shutDownC
+		_, ok := <-s.Server.shutDownC
 		if !ok {
 			ln.Close()
 		}
@@ -143,7 +143,7 @@ func (s *DefaultMta) ListenAndServe() error {
 
 	err = s.listen(ln)
 	log.Printf("Waiting for connections to close...")
-	s.mta.wg.Wait()
+	s.Server.wg.Wait()
 	return err
 }
 
@@ -164,14 +164,14 @@ func (s *DefaultMta) listen(ln net.Listener) error {
 			return err
 		}
 
-		s.mta.wg.Add(1)
+		s.Server.wg.Add(1)
 		go s.serve(c)
 	}
 
 }
 
 func (s *DefaultMta) serve(c net.Conn) {
-	defer s.mta.wg.Done()
+	defer s.Server.wg.Done()
 
 	proto := smtp.NewMtaProtocol(c)
 	if proto == nil {
@@ -179,11 +179,11 @@ func (s *DefaultMta) serve(c net.Conn) {
 		c.Close()
 		return
 	}
-	s.mta.HandleClient(proto)
+	s.Server.HandleClient(proto)
 }
 
 // HandleClient Start communicating with a client
-func (s *Mta) HandleClient(proto smtp.Protocol) {
+func (s *Server) HandleClient(proto smtp.Protocol) {
 	//log.Printf("Received connection")
 
 	// Hold state for this client connection
