@@ -287,6 +287,10 @@ func (s *Server) HandleClient(proto smtp.Protocol) {
 				messages = append(messages, "STARTTLS")
 			}
 
+			if !s.config.DisableAuth && s.AuthBackend != nil {
+				messages = append(messages, "AUTH PLAIN")
+			}
+
 			messages = append(messages, "OK")
 
 			proto.Send(smtp.MultiAnswer{
@@ -509,6 +513,7 @@ func (s *Server) HandleClient(proto smtp.Protocol) {
 
 		case smtp.AuthCmd:
 
+			// make sure to add auth mechanisms to the EHLO command
 			if cmd.Mechanism != "PLAIN" {
 				proto.Send(smtp.Answer{
 					Status:  smtp.UnrecognizedAuthenticationType,
