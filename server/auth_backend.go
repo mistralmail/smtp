@@ -9,17 +9,22 @@ import (
 type AuthBackend interface {
 	// Login checks whether the credentials of a user are valid.
 	// returns ErrInvalidCredentials if credentials not valid.
-	Login(username string, password string) (*User, error)
+	Login(username string, password string) (User, error)
 }
 
 // User denotes an authenticated SMTP user.
-type User struct {
+type User interface {
+	Username() string
+}
+
+// SMTPUser is a quick implementation of the User interface
+type SMTPUser struct {
 	// Username is the username / email address of the user.
 	username string
 }
 
 // Username returns the username
-func (u *User) Username() string {
+func (u *SMTPUser) Username() string {
 	return u.username
 }
 
@@ -32,13 +37,13 @@ type AuthBackendMemory struct {
 }
 
 // Login checks whether the credentials of a user are valid
-func (auth *AuthBackendMemory) Login(username string, password string) (*User, error) {
+func (auth *AuthBackendMemory) Login(username string, password string) (User, error) {
 	if auth.Credentials == nil {
 		return nil, fmt.Errorf("auth backend not initialized")
 	}
 	if passwordToMatch, ok := auth.Credentials[username]; ok {
 		if passwordToMatch == password {
-			return &User{username: username}, nil
+			return &SMTPUser{username: username}, nil
 		}
 		return nil, ErrInvalidCredentials
 	}
