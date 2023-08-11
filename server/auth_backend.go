@@ -3,13 +3,15 @@ package server
 import (
 	"errors"
 	"fmt"
+
+	"github.com/gopistolet/smtp/smtp"
 )
 
 // AuthBackend represents a pluggable authentication backend for the MTA
 type AuthBackend interface {
 	// Login checks whether the credentials of a user are valid.
 	// returns ErrInvalidCredentials if credentials not valid.
-	Login(username string, password string) (User, error)
+	Login(state *smtp.State, username string, password string) (User, error)
 }
 
 // User denotes an authenticated SMTP user.
@@ -37,7 +39,7 @@ type AuthBackendMemory struct {
 }
 
 // Login checks whether the credentials of a user are valid
-func (auth *AuthBackendMemory) Login(username string, password string) (User, error) {
+func (auth *AuthBackendMemory) Login(state *smtp.State, username string, password string) (User, error) {
 	if auth.Credentials == nil {
 		return nil, fmt.Errorf("auth backend not initialized")
 	}

@@ -579,7 +579,7 @@ func (s *Server) HandleClient(proto smtp.Protocol) {
 				break
 			}
 
-			user, err := s.AuthBackend.Login(authenticationIdenity, password)
+			user, err := s.AuthBackend.Login(state, authenticationIdenity, password)
 			if err == ErrInvalidCredentials {
 				// Invalid credentials
 				state.Authenticated = false
@@ -609,6 +609,8 @@ func (s *Server) HandleClient(proto smtp.Protocol) {
 					Status:  smtp.TemporaryAuthenticationFailure,
 					Message: "4.7.0 Temporary authentication failure",
 				})
+
+				break
 			}
 
 			// Valid auth
