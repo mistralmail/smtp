@@ -127,6 +127,7 @@ func (s *DefaultMta) Stop() {
 }
 
 func (s *DefaultMta) ListenAndServe() error {
+	log.Printf("Starting SMTP server at port %d", s.Server.config.Port)
 	ln, err := net.Listen("tcp", fmt.Sprintf("%s:%d", s.Server.config.Ip, s.Server.config.Port))
 	if err != nil {
 		log.Errorf("Could not start listening: %v", err)
