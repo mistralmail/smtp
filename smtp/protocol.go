@@ -9,7 +9,7 @@ import (
 	"net"
 	"strconv"
 
-	"github.com/gopistolet/gopistolet/log"
+	"github.com/mistralmail/mistralmail/log"
 )
 
 type StatusCode uint32

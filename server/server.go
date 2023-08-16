@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gopistolet/gopistolet/helpers"
-	"github.com/gopistolet/gopistolet/log"
-	"github.com/gopistolet/smtp/smtp"
+	"github.com/mistralmail/mistralmail/helpers"
+	"github.com/mistralmail/mistralmail/log"
+	"github.com/mistralmail/smtp/smtp"
 )
 
 type Config struct {

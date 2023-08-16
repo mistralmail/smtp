@@ -11,8 +11,8 @@ os:
 
 install:
   - go get github.com/smartystreets/goconvey/convey
-  - go get github.com/gopistolet/gopistolet/log
-  - go get github.com/gopistolet/gopistolet/helpers
+  - go get github.com/mistralmail/mistralmail/log
+  - go get github.com/mistralmail/mistralmail/helpers
 
 script:
   - go test -v ./...

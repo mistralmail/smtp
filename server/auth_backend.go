@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/gopistolet/smtp/smtp"
+	"github.com/mistralmail/smtp/smtp"
 )
 
 // AuthBackend represents a pluggable authentication backend for the MTA
