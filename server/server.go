@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/mistralmail/mistralmail/helpers"
-	"github.com/mistralmail/mistralmail/log"
 	"github.com/mistralmail/smtp/smtp"
+	log "github.com/sirupsen/logrus"
 )
 
 type Config struct {
