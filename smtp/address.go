@@ -1,8 +1,10 @@
 package smtp
 
-import "net/mail"
-import "strings"
-import "errors"
+import (
+	"errors"
+	"net/mail"
+	"strings"
+)
 
 type MailAddress mail.Address
 
@@ -47,15 +49,15 @@ func ParseAddress(rawAddress string) (MailAddress, error) {
 	*/
 	index := strings.LastIndex(rawAddress, "@")
 	if index == -1 {
-		return MailAddress{}, errors.New("Expected @ in mail address")
+		return MailAddress{}, errors.New("expected @ in mail address")
 	}
 	rawLocal := rawAddress[:index]
 	if len(rawLocal) > 64 {
-		return MailAddress{}, errors.New("Length of local part exceeds 64")
+		return MailAddress{}, errors.New("length of local part exceeds 64")
 	}
 	rawDomain := rawAddress[index+1:]
 	if len(rawDomain) > 255 {
-		return MailAddress{}, errors.New("Length of domain name part exceeds 255")
+		return MailAddress{}, errors.New("length of domain name part exceeds 255")
 	}
 
 	// Try to parse the mail address using Go's built-in functions:

@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mistralmail/mistralmail/helpers"
 	"github.com/mistralmail/smtp/smtp"
 	log "github.com/sirupsen/logrus"
 )
@@ -19,7 +18,7 @@ type Config struct {
 	Port        uint32
 	TlsCert     string
 	TlsKey      string
-	Blacklist   helpers.Blacklist
+	Blacklist   Blacklist
 	DisableAuth bool
 }
 
