@@ -858,9 +858,8 @@ github.com/mimuret/golang-iij-dpf v0.9.1/go.mod h1:sl9KyOkESib9+KRD3HaGpgi1xk7eo
 github.com/mistralmail/gospf v0.0.0-20160422193406-a58dd1fcbf50/go.mod h1:R5f9k3bciulRDjMcfVHa7XS+17nhA0/EYMBrVwtfmS4=
 github.com/mistralmail/gospf v0.0.0-20230816151716-f0afe66cc671/go.mod h1:M/VZfrMy4xzEl1/g7GQcEcXgG7PiSYj6FUgW1mvVNgs=
 github.com/mistralmail/imap v0.0.0-20230816155534-c5a8b2d4cdc5/go.mod h1:8Xz9iLfFAcBpB3RgxLdTn7EN+Odx9VtdFuDIm0MJDls=
-github.com/mistralmail/mistralmail v0.0.0-20230816153246-91c2beaf5547/go.mod h1:MEbRS4PBmrmftEG3rYrVUdq6+LuliKx5i04TiAIai2I=
-github.com/mistralmail/mistralmail v0.0.0-20230820133126-a67c029ab787 h1:pLYymRSdg10cel+h1cuClZZF1Wz5ZZN9vEut4MyziSE=
-github.com/mistralmail/mistralmail v0.0.0-20230820133126-a67c029ab787/go.mod h1:g3E3dJfOS56JkDutYx7QiF6AZxrYBaOg3MFc71I0N8o=
+github.com/mistralmail/mistralmail v0.0.0-20230910132058-b0347317ceb8 h1:sOdTr8pjRMA8i/CI/7dNxojO+v8mrDC+Ci3Bp3HFoRU=
+github.com/mistralmail/mistralmail v0.0.0-20230910132058-b0347317ceb8/go.mod h1:K0nkHVu2eDjdXUybTEIA3DFvJRPdhXvE4efbH/U6Q3c=
 github.com/mistralmail/smtp v0.0.0-20190814094038-be4f841baca2/go.mod h1:AJp1u/8KPILg8rExYTncKOtg9sAATpdRTTgiOrzMAFQ=
 github.com/mistralmail/smtp v0.0.0-20230816153543-329aae08a180/go.mod h1:PGxeM8si2tjHpyvok6f9GOZMZJzjq5z5GJhlJgTna0I=
 github.com/mitchellh/cli v1.0.0/go.mod h1:hNIlj7HEI86fIcpObd7a0FcrxTWetlwJDGcceTlRvqc=
