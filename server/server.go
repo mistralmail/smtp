@@ -427,6 +427,10 @@ func (s *Server) HandleClient(proto smtp.Protocol) {
 				} else {
 					// unknown internal server error
 					proto.Send(smtp.Answer{Status: 451, Message: "local error: something went wrong"})
+					log.WithFields(log.Fields{
+						"SessionId": state.SessionId.String(),
+						"Ip":        state.Ip.String(),
+					}).Errorf("couldn't handle mail: %v", err)
 				}
 			} else {
 				// mail successfully handled!
