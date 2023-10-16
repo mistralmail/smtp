@@ -735,10 +735,10 @@ func TestStartTls(t *testing.T) {
 	}
 
 	mta := New(cfg, HandlerFunc(dummyHandler))
-	mta.TlsConfig = &tls.Config{}
 	if mta == nil {
 		t.Fatal("Could not create mta server")
 	}
+	mta.TlsConfig = &tls.Config{}
 
 	c.Convey("Testing STARTTLS", t, func(ctx c.C) {
 		proto := &testProtocol{
@@ -940,10 +940,58 @@ func TestAuth(t *testing.T) {
 	if mta == nil {
 		t.Fatal("Could not create mta server")
 	}
+	mta.TlsConfig = &tls.Config{}
 
 	mta.AuthBackend = NewAuthBackendMemory(map[string]string{"some-username@example.com": "password1234"})
 
 	c.Convey("Testing AUTH with correct credentials", t, func(ctx c.C) {
+
+		proto := &testProtocol{
+			t:         t,
+			ctx:       ctx,
+			expectTLS: true,
+			cmds: []smtp.Cmd{
+				smtp.HeloCmd{
+					Domain: "some.sender",
+				},
+				smtp.StartTlsCmd{},
+				smtp.AuthCmd{
+					Mechanism:       "PLAIN",
+					InitialResponse: "AHNvbWUtdXNlcm5hbWVAZXhhbXBsZS5jb20AcGFzc3dvcmQxMjM0",
+				},
+				smtp.QuitCmd{},
+			},
+			answers: []interface{}{
+				smtp.Answer{
+					Status:  smtp.Ready,
+					Message: cfg.Hostname + " Service Ready",
+				},
+				smtp.Answer{
+					Status:  smtp.Ok,
+					Message: cfg.Hostname,
+				},
+				smtp.Answer{
+					Status: smtp.Ready,
+				},
+				smtp.Answer{
+					Status:  smtp.AuthenticationSucceeded,
+					Message: "2.7.0 Authentication successful",
+				},
+				smtp.Answer{
+					Status:  smtp.Closing,
+					Message: "Bye!",
+				},
+			},
+		}
+
+		c.So(proto.GetState().Authenticated, c.ShouldEqual, false)
+
+		mta.HandleClient(proto)
+		c.So(proto.GetState().Hostname, c.ShouldEqual, "some.sender")
+		c.So(proto.GetState().Authenticated, c.ShouldEqual, true)
+	})
+
+	c.Convey("Testing AUTH without STARTTLS", t, func(ctx c.C) {
 
 		proto := &testProtocol{
 			t:   t,
@@ -968,8 +1016,7 @@ func TestAuth(t *testing.T) {
 					Message: cfg.Hostname,
 				},
 				smtp.Answer{
-					Status:  smtp.AuthenticationSucceeded,
-					Message: "2.7.0 Authentication successful",
+					Status: smtp.EncryptionRequiredForRequestedAuthenticationMechanism,
 				},
 				smtp.Answer{
 					Status:  smtp.Closing,
@@ -982,18 +1029,20 @@ func TestAuth(t *testing.T) {
 
 		mta.HandleClient(proto)
 		c.So(proto.GetState().Hostname, c.ShouldEqual, "some.sender")
-		c.So(proto.GetState().Authenticated, c.ShouldEqual, true)
+		c.So(proto.GetState().Authenticated, c.ShouldEqual, false)
 	})
 
 	c.Convey("Testing AUTH with incorrect credentials", t, func(ctx c.C) {
 
 		proto := &testProtocol{
-			t:   t,
-			ctx: ctx,
+			t:         t,
+			ctx:       ctx,
+			expectTLS: true,
 			cmds: []smtp.Cmd{
 				smtp.HeloCmd{
 					Domain: "some.sender",
 				},
+				smtp.StartTlsCmd{},
 				smtp.AuthCmd{
 					Mechanism:       "PLAIN",
 					InitialResponse: "AHNvbWUtdXNlcm5hbWUAc29tZS1pbmNvcnJlY3QtcGFzc3dvcmQ=",
@@ -1008,6 +1057,9 @@ func TestAuth(t *testing.T) {
 				smtp.Answer{
 					Status:  smtp.Ok,
 					Message: cfg.Hostname,
+				},
+				smtp.Answer{
+					Status: smtp.Ready,
 				},
 				smtp.Answer{
 					Status:  smtp.AuthenticationCredentialsInvalid,
@@ -1030,12 +1082,14 @@ func TestAuth(t *testing.T) {
 	c.Convey("Testing AUTH with credentials in different command", t, func(ctx c.C) {
 
 		proto := &testProtocol{
-			t:   t,
-			ctx: ctx,
+			t:         t,
+			ctx:       ctx,
+			expectTLS: true,
 			cmds: []smtp.Cmd{
 				smtp.HeloCmd{
 					Domain: "some.sender",
 				},
+				smtp.StartTlsCmd{},
 				smtp.AuthCmd{
 					Mechanism:       "PLAIN",
 					InitialResponse: "",
@@ -1051,6 +1105,9 @@ func TestAuth(t *testing.T) {
 				smtp.Answer{
 					Status:  smtp.Ok,
 					Message: cfg.Hostname,
+				},
+				smtp.Answer{
+					Status: smtp.Ready,
 				},
 				smtp.Answer{
 					Status:  smtp.AuthenticationSucceeded,
@@ -1073,12 +1130,14 @@ func TestAuth(t *testing.T) {
 	c.Convey("Testing AUTH with unknown mechanism", t, func(ctx c.C) {
 
 		proto := &testProtocol{
-			t:   t,
-			ctx: ctx,
+			t:         t,
+			ctx:       ctx,
+			expectTLS: true,
 			cmds: []smtp.Cmd{
 				smtp.HeloCmd{
 					Domain: "some.sender",
 				},
+				smtp.StartTlsCmd{},
 				smtp.AuthCmd{
 					Mechanism:       "SOME_UNKNOWN_MECHANISM",
 					InitialResponse: "",
@@ -1093,6 +1152,9 @@ func TestAuth(t *testing.T) {
 				smtp.Answer{
 					Status:  smtp.Ok,
 					Message: cfg.Hostname,
+				},
+				smtp.Answer{
+					Status: smtp.Ready,
 				},
 				smtp.Answer{
 					Status:  smtp.UnrecognizedAuthenticationType,
@@ -1115,12 +1177,14 @@ func TestAuth(t *testing.T) {
 	c.Convey("Testing MAIL FROM when not authenticated and again after authentication", t, func(ctx c.C) {
 
 		proto := &testProtocol{
-			t:   t,
-			ctx: ctx,
+			t:         t,
+			ctx:       ctx,
+			expectTLS: true,
 			cmds: []smtp.Cmd{
 				smtp.HeloCmd{
 					Domain: "some.sender",
 				},
+				smtp.StartTlsCmd{},
 				smtp.MailCmd{
 					From: getMailWithoutError("test@test.com"),
 				},
@@ -1141,6 +1205,9 @@ func TestAuth(t *testing.T) {
 				smtp.Answer{
 					Status:  smtp.Ok,
 					Message: cfg.Hostname,
+				},
+				smtp.Answer{
+					Status: smtp.Ready,
 				},
 				smtp.Answer{
 					Status:  smtp.AuthenticationRequired,
@@ -1171,12 +1238,14 @@ func TestAuth(t *testing.T) {
 	c.Convey("Testing AUTH when sending from a wrong email address", t, func(ctx c.C) {
 
 		proto := &testProtocol{
-			t:   t,
-			ctx: ctx,
+			t:         t,
+			ctx:       ctx,
+			expectTLS: true,
 			cmds: []smtp.Cmd{
 				smtp.HeloCmd{
 					Domain: "some.sender",
 				},
+				smtp.StartTlsCmd{},
 				smtp.AuthCmd{
 					Mechanism:       "PLAIN",
 					InitialResponse: "AHNvbWUtdXNlcm5hbWVAZXhhbXBsZS5jb20AcGFzc3dvcmQxMjM0",
@@ -1204,6 +1273,9 @@ func TestAuth(t *testing.T) {
 				smtp.Answer{
 					Status:  smtp.Ok,
 					Message: cfg.Hostname,
+				},
+				smtp.Answer{
+					Status: smtp.Ready,
 				},
 				smtp.Answer{
 					Status:  smtp.AuthenticationSucceeded,

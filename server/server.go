@@ -517,6 +517,15 @@ func (s *Server) HandleClient(proto smtp.Protocol) {
 
 		case smtp.AuthCmd:
 
+			// check whether the connection is secure
+			if !state.Secure {
+				proto.Send(smtp.Answer{
+					Status:  smtp.EncryptionRequiredForRequestedAuthenticationMechanism,
+					Message: "5.7.0 Must issue a STARTTLS command first.",
+				})
+				break
+			}
+
 			// make sure to add auth mechanisms to the EHLO command
 			if cmd.Mechanism != "PLAIN" {
 				proto.Send(smtp.Answer{
