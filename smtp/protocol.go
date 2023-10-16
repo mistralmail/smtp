@@ -143,7 +143,7 @@ func (r *DataReader) Read(b []byte) (n int, err error) {
 		r.bytesInLine++
 		if r.bytesInLine > MAX_DATA_LINE {
 			err = ErrLtl
-			SkipTillNewline(br)
+			_ = SkipTillNewline(br)
 			r.bytesInLine = 0
 			r.state = stateBeginLine
 			break
@@ -178,7 +178,10 @@ func (r *DataReader) Read(b []byte) (n int, err error) {
 			}
 			// Not part of .\r\n.
 			// Consume leading dot and emit saved \r.
-			br.UnreadByte()
+			err := br.UnreadByte()
+			if err != nil {
+				return n, fmt.Errorf("couldn't unread byte: %w", err)
+			}
 			c = '\r'
 			r.state = stateData
 
@@ -189,7 +192,10 @@ func (r *DataReader) Read(b []byte) (n int, err error) {
 				break
 			}
 			// Not part of \r\n.  Emit saved \r
-			br.UnreadByte()
+			err := br.UnreadByte()
+			if err != nil {
+				return n, fmt.Errorf("couldn't unread byte: %w", err)
+			}
 			c = '\r'
 			r.state = stateData
 

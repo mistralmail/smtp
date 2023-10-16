@@ -234,7 +234,7 @@ func parseLine(br *bufio.Reader) (string, map[string]Argument, error) {
 	buffer, err := ReadUntill('\n', MAX_CMD_LINE, br)
 	if err != nil {
 		if err == ErrLtl {
-			SkipTillNewline(br)
+			_ = SkipTillNewline(br)
 			return string(buffer), map[string]Argument{}, err
 		}
 
