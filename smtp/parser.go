@@ -284,10 +284,10 @@ func parseLine(br *bufio.Reader) (string, map[string]Argument, error) {
 func parseFROM(from string) (*MailAddress, error) {
 	index := strings.Index(from, ":")
 	if index == -1 {
-		return nil, errors.New("No FROM given (didn't find ':')")
+		return nil, errors.New("no FROM given (didn't find ':')")
 	}
 	if strings.ToLower(from[0:index]) != "from" {
-		return nil, errors.New("No FROM given")
+		return nil, errors.New("no FROM given")
 	}
 
 	address_str := from[index+1:]
@@ -302,10 +302,10 @@ func parseFROM(from string) (*MailAddress, error) {
 func parseTO(to string) (*MailAddress, error) {
 	index := strings.Index(to, ":")
 	if index == -1 {
-		return nil, errors.New("No TO given (didn't find ':')")
+		return nil, errors.New("no TO given (didn't find ':')")
 	}
 	if strings.ToLower(to[0:index]) != "to" {
-		return nil, errors.New("No TO given")
+		return nil, errors.New("no TO given")
 	}
 
 	address_str := to[index+1:]

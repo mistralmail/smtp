@@ -46,10 +46,10 @@ const (
 )
 
 // ErrLtl Line too long error
-var ErrLtl = errors.New("Line too long")
+var ErrLtl = errors.New("line too long")
 
 // ErrIncomplete Incomplete data error
-var ErrIncomplete = errors.New("Incomplete data")
+var ErrIncomplete = errors.New("incomplete data")
 
 const (
 	MAX_DATA_LINE = 1000
@@ -270,7 +270,7 @@ type UnknownCmd struct {
 }
 
 func (c UnknownCmd) String() string {
-	return fmt.Sprintf("%s", c.Cmd)
+	return c.Cmd
 }
 
 type HeloCmd struct {

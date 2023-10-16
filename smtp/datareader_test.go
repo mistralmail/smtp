@@ -3,7 +3,7 @@ package smtp
 import (
 	"bufio"
 	"bytes"
-	"io/ioutil"
+	"io"
 	"testing"
 )
 
@@ -11,8 +11,8 @@ func compare(t *testing.T, data []byte, expected []byte) {
 	br := bufio.NewReader(bytes.NewReader(data))
 
 	dataReader := NewDataReader(br)
-	output, err := ioutil.ReadAll(dataReader)
-	if bytes.Compare(output, expected) != 0 {
+	output, err := io.ReadAll(dataReader)
+	if !bytes.Equal(output, expected) {
 		t.Errorf("Expected %v\ngot %v\n", expected, output)
 	}
 	if err != nil {
@@ -24,7 +24,7 @@ func compare(t *testing.T, data []byte, expected []byte) {
 func expectError(t *testing.T, data []byte, expected error) {
 	br := bufio.NewReader(bytes.NewReader(data))
 	dataReader := NewDataReader(br)
-	_, err := ioutil.ReadAll(dataReader)
+	_, err := io.ReadAll(dataReader)
 	if err != expected {
 		t.Errorf("Expected error: %v, got: %v", expected, err)
 	}

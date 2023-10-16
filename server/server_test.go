@@ -13,9 +13,6 @@ import (
 	c "github.com/smartystreets/goconvey/convey"
 )
 
-// Some default ip
-var someIp string = "1.2.3.4"
-
 // Dummy mail handler
 func dummyHandler(*smtp.State) error {
 	return nil

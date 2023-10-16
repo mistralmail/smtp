@@ -3,7 +3,7 @@ package server
 import (
 	"crypto/tls"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"sync"
 	"time"
@@ -114,10 +114,6 @@ func NewDefault(c Config, h Handler) *DefaultMta {
 	mta := &DefaultMta{
 		Server: New(c, h),
 	}
-	if mta == nil {
-		return nil
-	}
-
 	return mta
 }
 
@@ -152,10 +148,6 @@ func (s *DefaultMta) listen(ln net.Listener) error {
 	for {
 		c, err := ln.Accept()
 		if err != nil {
-			if ne, ok := err.(net.Error); ok && ne.Temporary() {
-				log.Printf("Accept error: %v", err)
-				continue
-			}
 			// Assume this means listener was closed.
 			if noe, ok := err.(*net.OpError); ok && !noe.Temporary() {
 				log.Printf("Listener is closed, stopping listen loop...")
@@ -266,7 +258,7 @@ func (s *Server) HandleClient(proto smtp.Protocol) {
 
 	quit = nextCmd()
 
-	for quit == false {
+	for !quit {
 
 		//log.Printf("Received cmd: %#v", *c)
 
@@ -392,7 +384,7 @@ func (s *Server) HandleClient(proto smtp.Protocol) {
 			})
 
 		tryAgain:
-			tmpData, err := ioutil.ReadAll(&cmd.R)
+			tmpData, err := io.ReadAll(&cmd.R)
 			state.Data = append(state.Data, tmpData...)
 			if err == smtp.ErrLtl {
 				proto.Send(smtp.Answer{
