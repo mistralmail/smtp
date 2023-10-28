@@ -16,10 +16,9 @@ type Config struct {
 	Ip          string
 	Hostname    string
 	Port        uint32
-	TlsCert     string
-	TlsKey      string
 	Blacklist   Blacklist
 	DisableAuth bool
+	TLSConfig   *tls.Config
 }
 
 // Session id
@@ -70,17 +69,7 @@ func New(c Config, h Handler) *Server {
 		MailHandler: h,
 		quitC:       make(chan bool),
 		shutDownC:   make(chan bool),
-	}
-
-	if c.TlsCert != "" && c.TlsKey != "" {
-		cert, err := tls.LoadX509KeyPair(c.TlsCert, c.TlsKey)
-		if err != nil {
-			log.Warnf("Could not load keypair: %v", err)
-		} else {
-			mta.TlsConfig = &tls.Config{
-				Certificates: []tls.Certificate{cert},
-			}
-		}
+		TlsConfig:   c.TLSConfig,
 	}
 
 	// TODO what if authbackend is nil?
