@@ -1,8 +1,11 @@
 package smtp
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"net"
+	"strings"
 )
 
 // State contains all the state for a single client
@@ -83,4 +86,28 @@ func (s *State) AuthMatchesRcptAndMail() (bool, string) {
 func (s *State) AddHeader(headerKey string, headerValue string) {
 	header := fmt.Sprintf("%s: %s\r\n", headerKey, headerValue)
 	s.Data = append([]byte(header), s.Data...)
+}
+
+// GetHeader gets a header from the state.
+func (s *State) GetHeader(headerKey string) (headerValue string, ok bool) {
+	reader := bufio.NewReader(bytes.NewReader(s.Data))
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			break
+		}
+
+		// Headers end with an empty line
+		if len(strings.TrimSpace(line)) == 0 {
+			break
+		}
+
+		if strings.HasPrefix(strings.ToLower(line), strings.ToLower(headerKey)+":") {
+			// Found the header, extract the value
+			headerValue = strings.TrimSpace(line[len(headerKey)+1:])
+			return headerValue, true
+		}
+	}
+
+	return "", false
 }

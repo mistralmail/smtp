@@ -35,4 +35,41 @@ This is the body of the email.`
 		So(parsedMessage.Header.Get("From"), ShouldEqual, "sender@example.com")
 
 	})
+
+	Convey("GetHeader()", t, func() {
+		// Create a state object with a message
+		message := `From: sender@example.com
+To: recipient@example.com
+X-Spam-Score: -5.1
+Subject: Test Subject
+
+This is the body of the email.`
+
+		state := &State{
+			Data: []byte(message),
+		}
+
+		headerValue, ok := state.GetHeader("To")
+		So(ok, ShouldBeTrue)
+		So(headerValue, ShouldEqual, "recipient@example.com")
+
+		headerValue, ok = state.GetHeader("to")
+		So(ok, ShouldBeTrue)
+		So(headerValue, ShouldEqual, "recipient@example.com")
+
+		headerValue, ok = state.GetHeader("TO")
+		So(ok, ShouldBeTrue)
+		So(headerValue, ShouldEqual, "recipient@example.com")
+
+		headerValue, ok = state.GetHeader("From")
+		So(ok, ShouldBeTrue)
+		So(headerValue, ShouldEqual, "sender@example.com")
+
+		headerValue, ok = state.GetHeader("X-Spam-Score")
+		So(ok, ShouldBeTrue)
+		So(headerValue, ShouldEqual, "-5.1")
+
+		_, ok = state.GetHeader("Date")
+		So(ok, ShouldBeFalse)
+	})
 }
